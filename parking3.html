@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rudona Mall | Smart Parking</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital@0;1&family=Montserrat:wght@300;600&display=swap" rel="stylesheet">
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+<style>
+:root {
+  --gold: #f1c40f;
+  --red: #e74c3c;
+  --green: rgba(46, 204, 113, 0.6);
+  --glass: rgba(255,255,255,0.1);
+}
+body {
+  background: linear-gradient(rgba(0,0,0,0.8), rgba(0,0,0,0.8)), url('https://images.unsplash.com/photo-1519501025264-65ba15a82390?auto=format&fit=crop&w=1000&q=80');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  color: white;
+  font-family: 'Montserrat', sans-serif;
+  margin:0;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  min-height:100vh;
+  padding:20px;
+}
+.glass-card {
+  background: var(--glass);
+  backdrop-filter: blur(15px);
+  border:1px solid rgba(255,255,255,0.2);
+  border-radius:20px;
+  padding:25px;
+  width:100%;
+  max-width:400px;
+  text-align:center;
+  margin-bottom:20px;
+}
+header h1{font-family:'Playfair Display',serif;letter-spacing:6px;margin:0;font-size:2rem;}
+header p{font-size:0.8rem;opacity:0.7;margin-top:5px;}
+.parking-grid {
+  display:grid;
+  grid-template-columns:repeat(2,auto);
+  gap:20px;
+  justify-content:center;
+  margin:20px 0;
+}
+.spot {
+  width:150px;
+  padding:20px 0;
+  font-size:2rem;
+  border-radius:15px;
+  text-align:center;
+  cursor:pointer;
+  font-weight:600;
+  transition:all 0.3s ease;
+  user-select:none;
+}
+.available { background: var(--green); color:white; }
+.reserved { background: rgba(241,196,15,0.4); color: var(--gold); border:1px solid var(--gold);}
+.parked { background: rgba(231,76,60,0.4); color: var(--red); cursor:not-allowed;}
+.legend{font-size:0.7rem;text-align:center;margin-bottom:20px;}
+.status-info{font-size:1rem;margin-top:10px;min-height:1.5rem;color:var(--gold);}
+footer{font-size:0.6rem;letter-spacing:2px;text-transform:uppercase;margin-top:20px;opacity:0.8;line-height:1.6;text-align:center;}
+</style>
+</head>
+<body>
+
+<div class="glass-card">
+  <header>
+    <h1>WELCOME</h1>
+    <p>to</p>
+    <h1>RUDONA MALL</h1>
+    <p>Reserve Your Parking Before Entering</p>
+  </header>
+</div>
+
+<div class="glass-card" style="max-width:100px;margin-bottom:20px;">
+  <div style="font-family:'Playfair Display',serif;font-weight:600;font-size:0.9rem;padding:0.01px;border-radius:15px;">
+    Reserve your parking spot now!
+  </div>
+</div>
+
+<div class="parking-grid" id="grid">
+  <div class="spot available" id="A1" onclick="reserveSpot('A1')">A1</div>
+  <div class="spot available" id="B1" onclick="reserveSpot('B1')">B1</div>
+  <div class="spot available" id="A2" onclick="reserveSpot('A2')">A2</div>
+  <div class="spot available" id="B2" onclick="reserveSpot('B2')">B2</div>
+  <div class="spot available" id="A3" onclick="reserveSpot('A3')">A3</div>
+  <div class="spot available" id="B3" onclick="reserveSpot('B3')">B3</div>
+</div>
+
+<div class="legend">
+  <span style="color: var(--red)">●</span> PARKED &nbsp;
+  <span style="color: var(--gold)">●</span> RESERVED &nbsp;
+  <span style="color: var(--green)">●</span> AVAILABLE
+</div>
+
+<div class="glass-card">
+  <div class="status-info" id="status-text">Select a spot above</div>
+</div>
+
+<footer>
+  Enter your parking spot along with "#" when you're at the gate
+</footer>
+
+<script>
+  // --- Firebase Setup ---
+  const firebaseConfig = {
+    apiKey: "AIzaSyBdr37QKKw_eImZcdzSMYIH52RD80dZoI0",
+    authDomain: "rudano-f14a0.firebaseapp.com",
+    databaseURL: "https://rudano-f14a0-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "rudano-f14a0",
+    storageBucket: "rudano-f14a0.firebasestorage.app",
+    messagingSenderId: "166239475355",
+    appId: "1:166239475355:web:757299a9f74265b8ffd83e"
+  };
+  const app = firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  let countdowns = {};
+
+  // Reserve a spot
+  function reserveSpot(id){
+    const spot = document.getElementById(id);
+    if(spot.classList.contains('available')){
+      spot.className = 'spot reserved';
+      updateFirebase(id, 'reserved');
+      startTimer(id);
+    }
+  }
+
+  // Timer
+  function startTimer(id){
+    if(countdowns[id]) clearInterval(countdowns[id]);
+    let timeLeft = 120;
+    countdowns[id] = setInterval(()=>{
+      timeLeft--;
+      document.getElementById('status-text').innerText = `Reserved ${id} (${Math.floor(timeLeft/60)}:${timeLeft%60<10?'0'+timeLeft%60:timeLeft%60})`;
+      if(timeLeft<=0){
+        clearInterval(countdowns[id]);
+        deleteFirebase(id);
+        const spot = document.getElementById(id);
+        spot.className='spot available';
+        document.getElementById('status-text').innerText = 'Reservation Expired!';
+      }
+    },1000);
+  }
+
+  // Firebase update
+  function updateFirebase(id, status){
+    db.ref('spots/'+id).set({status: status, timestamp: Date.now()});
+  }
+
+  // Delete Firebase entry
+  function deleteFirebase(id){
+    db.ref('spots/'+id).remove();
+  }
+
+  // --- Live updates from Firebase ---
+  const spots = ['A1','B1','A2','B2','A3','B3'];
+  spots.forEach(id=>{
+    db.ref('spots/'+id+'/status').on('value', snapshot=>{
+      if(snapshot.exists()){
+        document.getElementById(id).className = 'spot '+snapshot.val();
+      } else {
+        document.getElementById(id).className = 'spot available';
+      }
+    });
+  });
+</script>
+
+</body>
+</html>
